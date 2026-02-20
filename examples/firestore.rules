@@ -1,0 +1,190 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /* =========================
+       ROLE HELPERS
+    ========================= */
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        (userDoc().data.role == 'admin' ||
+         userDoc().data.role == 'superAdmin');
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() &&
+        userDoc().data.role == 'superAdmin';
+    }
+
+    /* =========================
+       USERS
+    ========================= */
+
+    match /users/{userId} {
+
+      allow read: if isSignedIn() &&
+        (request.auth.uid == userId || isAdmin());
+
+      allow create: if isSignedIn() &&
+        request.auth.uid == userId;
+
+      allow update: if isSignedIn() && (
+        request.auth.uid == userId ||
+
+        // Admin editing regular users only
+        (isAdmin() &&
+          resource.data.role != 'admin' &&
+          resource.data.role != 'superAdmin') ||
+
+        // SuperAdmin can change roles except to superAdmin
+        (isSuperAdmin() &&
+          request.resource.data.role != 'superAdmin')
+      );
+
+      allow delete: if isSuperAdmin() ||
+        (isAdmin() &&
+          resource.data.role != 'admin' &&
+          resource.data.role != 'superAdmin');
+    }
+
+    /* =========================
+       POSTS
+    ========================= */
+
+    match /posts/{postId} {
+      allow create: if isSignedIn() &&
+        request.auth.uid == request.resource.data.userId;
+
+      allow read: if isSignedIn() &&
+        (request.auth.uid == resource.data.userId || isAdmin());
+
+      allow update, delete: if isSignedIn() &&
+        (request.auth.uid == resource.data.userId || isAdmin());
+    }
+
+    /* =========================
+       ADMIN REQUESTS
+    ========================= */
+
+    match /adminRequests/{requestId} {
+      allow create: if isAdmin() &&
+        request.resource.data.requestedBy == request.auth.uid;
+
+      allow read: if isAdmin();
+
+      allow update, delete: if isSuperAdmin();
+    }
+
+    /* =========================
+       ANNOUNCEMENTS
+    ========================= */
+
+    match /announcements/{announcementId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    /* =========================
+   GLOBAL CONNECTED ACCOUNTS
+========================= */
+
+match /globalConnectedAccounts/{platform} {
+
+  // Everyone signed in can read status
+  allow read: if isSignedIn();
+
+  // Only Super Admin can connect / disconnect
+  allow create, update, delete: if isSuperAdmin();
+}
+
+    /* =========================
+       ANALYTICS
+    ========================= */
+
+    match /analytics/{analyticsId} {
+      allow create: if isSignedIn() &&
+        request.auth.uid == request.resource.data.userId;
+
+      allow read, update, delete: if isSignedIn() &&
+        (request.auth.uid == resource.data.userId || isAdmin());
+    }
+
+    /* =========================
+       NOTIFICATIONS (FIXED)
+    ========================= */
+
+    match /notifications/{notificationId} {
+
+      // User can read only their notifications
+      allow read: if isSignedIn() &&
+        resource.data.userId == request.auth.uid;
+
+      // Admins can create notifications
+      allow create: if isAdmin() &&
+        request.resource.data.userId is string &&
+        request.resource.data.read is bool &&
+        request.resource.data.createdAt is timestamp;
+
+      // User can only update the "read" field
+      allow update: if isSignedIn() &&
+        request.auth.uid == resource.data.userId &&
+        request.resource.data.diff(resource.data)
+          .changedKeys().hasOnly(['read']);
+
+      allow delete: if false;
+    }
+
+    /* =========================
+       TEMPLATES (basic kept)
+    ========================= */
+
+    match /templates/{templateId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /occasionTemplates/{templateId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /schoolTemplates/{templateId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /publicTemplates/{templateId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+/* =========================
+   GLOBAL CONNECTED ACCOUNTS
+========================= */
+
+match /globalConnectedAccounts/{platform} {
+
+  // Everyone signed in can read status
+  allow read: if isSignedIn();
+
+  // Only Super Admin can connect / disconnect
+  allow create, update, delete: if isSuperAdmin();
+}
+
+    /* =========================
+       DEFAULT DENY
+    ========================= */
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
