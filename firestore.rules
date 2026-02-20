@@ -1,0 +1,187 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================
+    // 🔒 ROLE HELPERS
+    // ===============================
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data
+        : null;
+    }
+
+    function userRole() {
+      return userDoc() != null ? userDoc().role : null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        (userRole() == "admin" || userRole() == "superAdmin");
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() &&
+        userRole() == "superAdmin";
+    }
+
+    // ===============================
+    // 👤 USERS
+    // ===============================
+
+    match /users/{userId} {
+
+      allow read: if isSignedIn() &&
+        (request.auth.uid == userId || isAdmin());
+
+      allow create: if isSignedIn() &&
+        request.auth.uid == userId;
+
+      // User updates own profile but NOT role
+      allow update: if isSignedIn() &&
+        request.auth.uid == userId &&
+        request.resource.data.role == resource.data.role;
+
+      // SuperAdmin can update ANYTHING
+      allow update: if isSuperAdmin();
+
+      allow delete: if isSuperAdmin();
+
+      // 🔔 USER NOTIFICATIONS SUBCOLLECTION
+      match /notifications/{notificationId} {
+        allow read, update: if isSignedIn() &&
+          request.auth.uid == userId;
+        allow create: if isSignedIn();
+        allow delete: if isSignedIn() &&
+          request.auth.uid == userId;
+      }
+    }
+
+    // ===============================
+    // 📦 POSTS
+    // ===============================
+
+    match /posts/{postId} {
+
+      // Create draft
+      allow create: if isSignedIn() &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.status == "draft";
+
+      // Read own posts or admin access
+      allow read: if isSignedIn() &&
+        (resource.data.userId == request.auth.uid || isAdmin());
+
+      // User edits ONLY own drafts
+      allow update: if isSignedIn() &&
+        resource.data.userId == request.auth.uid &&
+        resource.data.status == "draft" &&
+        request.resource.data.status == "draft";
+
+      // Admin approves or rejects
+      allow update: if isAdmin() &&
+        resource.data.status == "pending" &&
+        request.resource.data.status in ["approved", "rejected"];
+
+      // SuperAdmin publishes
+      allow update: if isSuperAdmin() &&
+        resource.data.status == "approved" &&
+        request.resource.data.status == "published";
+
+      allow delete: if isAdmin();
+    }
+
+    // ===============================
+    // 📊 ANALYTICS
+    // ===============================
+
+    match /analytics/{analyticsId} {
+      allow create: if isSignedIn() &&
+        request.resource.data.userId == request.auth.uid;
+
+      allow read, update, delete: if isSignedIn() &&
+        (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    // ===============================
+    // 📢 ANNOUNCEMENTS
+    // ===============================
+
+    match /announcements/{announcementId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ===============================
+    // ⚙ ADMIN SETTINGS
+    // ===============================
+
+    match /AdminSettings/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    // ===============================
+    // 📨 ADMIN ROLE REQUESTS
+    // ===============================
+
+    match /adminRequests/{requestId} {
+      allow create: if isAdmin() &&
+        request.resource.data.requestedBy == request.auth.uid;
+
+      allow read: if isAdmin();
+
+      allow update, delete: if isSuperAdmin();
+    }
+
+    // ===============================
+    // 📜 API KEY AUDIT LOG
+    // ===============================
+
+    match /ApiKeyAuditLog/{logId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn();
+    }
+
+    // ===============================
+    // 🌐 GLOBAL CONNECTED ACCOUNTS
+    // ===============================
+
+    match /globalConnectedAccounts/{platform} {
+      allow read: if isAdmin();
+      allow write: if isSuperAdmin();
+    }
+
+    // ===============================
+    // 🌐 PUBLIC TEMPLATES
+    // ===============================
+
+    match /publicTemplates/{templateId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /schoolTemplates/{templateId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /occasionTemplates/{templateId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ===============================
+    // 🔐 FALLBACK DENY
+    // ===============================
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
