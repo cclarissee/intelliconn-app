@@ -127,6 +127,26 @@ export default function CreatePost({ visible, onClose, post, onNotify }: { visib
   const { showWarning, notificationProps: warningNotificationProps } = useWarningNotification();
   const notify = onNotify ?? showSuccess;
   const shouldRenderNotification = true; // Always render to show warnings and success
+  const [showMediaBrowser, setShowMediaBrowser] = useState(false);
+  const STOCK_PHOTOS = [
+  {
+    id: 'tech1',
+    source: require('../assets/stock/tech1.jpg'),
+  },
+  {
+    id: 'tech2',
+    source: require('../assets/stock/tech2.jpg'),
+  },
+  {
+    id: 'education1',
+    source: require('../assets/stock/tech3.jpg'),
+  },
+  {
+    id: 'coding1',
+    source: require('../assets/stock/tech4.jpg'),
+  },
+];
+
   const notifyAndClose = (options: NotifyOptions) => {
     if (onNotify) {
       onClose();
@@ -216,6 +236,7 @@ export default function CreatePost({ visible, onClose, post, onNotify }: { visib
     instagram: null as string | null,
   });
 
+  
   // Start spin animation when creating post
   useEffect(() => {
     if (isCreatingPost) {
@@ -461,11 +482,6 @@ export default function CreatePost({ visible, onClose, post, onNotify }: { visib
   const validateFields = () => {
     const newErrors: typeof errors = {};
     let hasErrors = false;
-
-    if (!title.trim()) {
-      newErrors.title = true;
-      hasErrors = true;
-    }
 
     if (!content.trim()) {
       newErrors.content = true;
@@ -2099,14 +2115,14 @@ const shareViaNative = async () => {
             <View style={styles.handle} />
 
           <ScrollView showsVerticalScrollIndicator={false}>
-            <Text style={styles.title}>{post ? 'Edit Post' : 'Create Post'}</Text>
-            <Text style={styles.subtitle}>{post ? 'Update your post details' : '🎓 AI-powered Computer Studies content'}</Text>
+            <Text style={styles.title}>{post ? 'Edit Post' : 'Create New Content'}</Text>
+            <Text style={styles.subtitle}>{post ? 'Update your post details' : 'AI-powered Computer Studies content'}</Text>
 
             {/* Prompt Input */}
-            <Text style={styles.section}>AI Prompt</Text>
+            <Text style={styles.section}>AI Assistant</Text>
             <TextInput
               style={styles.input}
-              placeholder="e.g., 'Python basics for beginners' or 'Web development tips'"
+              placeholder="Describe what you want to create..."
               value={prompt}
               onChangeText={setPrompt}
               multiline
@@ -2137,60 +2153,155 @@ const shareViaNative = async () => {
             </View>
 
             {/* Platforms */}
-            <Text style={styles.section}>Platforms</Text>
-            <View style={[styles.pillRow, errors.platforms && styles.pillRowError]}>
-              {['Facebook', 'Instagram', 'Twitter'].map(p => (
-                <TouchableOpacity
-                  key={p}
-                  style={[styles.pill, platforms.includes(p) && styles.pillActive]}
-                  onPress={() => {
-                    togglePlatform(p);
-                    setErrors(prev => ({ ...prev, platforms: false }));
-                  }}
-                >
-                  <Ionicons
-                    name={getPlatformIcon(p) as any}
-                    size={16}
-                    color={platforms.includes(p) ? '#fff' : '#374151'}
-                    style={{ marginRight: 6 }}
-                  />
-                  <Text style={[styles.pillText, platforms.includes(p) && styles.pillTextActive]}>
-                    {p}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            {errors.platforms && <Text style={styles.errorText}>⚠️ Select at least one platform</Text>}
+<Text style={styles.section}>Platforms</Text>
 
-            {/* Brand Voice */}
-            <Text style={styles.section}>Brand Voice</Text>
-            <View style={styles.pillRow}>
-              {['Professional', 'Casual', 'Playful', 'Authoritative'].map(v => (
-                <TouchableOpacity
-                  key={v}
-                  style={[styles.pill, brandVoice === v && styles.pillActive]}
-                  onPress={() => setBrandVoice(v)}
-                >
-                  <Text style={[styles.pillText, brandVoice === v && styles.pillTextActive]}>
-                    {v}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+<View style={{ marginBottom: 12 }}>
+  {/* Row 1 - Facebook & Instagram */}
+  <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
+    {['Facebook', 'Instagram'].map(p => (
+      <TouchableOpacity
+        key={p}
+        style={[
+          {
+            flex: 1,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingVertical: 12,
+            borderRadius: 12,
+            borderWidth: 1.5,
+            borderColor: platforms.includes(p) ? '#6366F1' : '#E5E7EB',
+            backgroundColor: platforms.includes(p) ? '#EEF2FF' : '#FFFFFF',
+          }
+        ]}
+        onPress={() => {
+          togglePlatform(p);
+          setErrors(prev => ({ ...prev, platforms: false }));
+        }}
+      >
+        <Ionicons
+          name={getPlatformIcon(p) as any}
+          size={18}
+          color={platforms.includes(p) ? '#6366F1' : '#6B7280'}
+          style={{ marginRight: 8 }}
+        />
+        <Text style={{
+          fontWeight: '600',
+          color: platforms.includes(p) ? '#4338CA' : '#374151'
+        }}>
+          {p}
+        </Text>
+      </TouchableOpacity>
+    ))}
+  </View>
 
-            {/* Title */}
-            <Text style={styles.section}>Title</Text>
-            <TextInput
-              style={[styles.input, errors.title && styles.inputError]}
-              placeholder="Post title"
-              value={title}
-              onChangeText={(text) => {
-                setTitle(text);
-                if (text.trim()) setErrors(prev => ({ ...prev, title: false }));
-              }}
-            />
-            {errors.title && <Text style={styles.errorText}>⚠️ Title is required</Text>}
+  {/* Row 2 - Twitter */}
+  <TouchableOpacity
+    style={{
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 12,
+      borderRadius: 12,
+      borderWidth: 1.5,
+      borderColor: platforms.includes('Twitter') ? '#000' : '#E5E7EB',
+      backgroundColor: platforms.includes('Twitter') ? '#F3F4F6' : '#FFFFFF',
+    }}
+    onPress={() => {
+      togglePlatform('Twitter');
+      setErrors(prev => ({ ...prev, platforms: false }));
+    }}
+  >
+    <Ionicons
+      name="logo-twitter"
+      size={18}
+      color={platforms.includes('Twitter') ? '#000' : '#6B7280'}
+      style={{ marginRight: 8 }}
+    />
+    <Text style={{
+      fontWeight: '600',
+      color: platforms.includes('Twitter') ? '#000' : '#374151'
+    }}>
+      Twitter
+    </Text>
+  </TouchableOpacity>
+</View>
 
+{errors.platforms && (
+  <Text style={styles.errorText}>
+    ⚠️ Select at least one platform
+  </Text>
+)}
+{/* Brand Voice */}
+<Text style={styles.section}>Brand Voice</Text>
+
+<View style={{ gap: 10, marginBottom: 16 }}>
+  {/* Row 1 */}
+  <View style={{ flexDirection: 'row', gap: 10 }}>
+    {['Professional', 'Casual'].map(v => (
+      <TouchableOpacity
+        key={v}
+        style={{
+          flex: 1,
+          paddingVertical: 12,
+          borderRadius: 12,
+          borderWidth: 1.5,
+          borderColor: brandVoice === v ? '#10B981' : '#E5E7EB',
+          backgroundColor: brandVoice === v ? '#ECFDF5' : '#FFFFFF',
+          alignItems: 'center'
+        }}
+        onPress={() => setBrandVoice(v)}
+      >
+        <Text style={{
+          fontWeight: '600',
+          color: brandVoice === v ? '#047857' : '#374151'
+        }}>
+          {v}
+        </Text>
+      </TouchableOpacity>
+    ))}
+  </View>
+
+  {/* Row 2 */}
+  <View style={{ flexDirection: 'row', gap: 10 }}>
+    {['Playful', 'Authoritative'].map(v => (
+      <TouchableOpacity
+        key={v}
+        style={{
+          flex: 1,
+          paddingVertical: 12,
+          borderRadius: 12,
+          borderWidth: 1.5,
+          borderColor: brandVoice === v ? '#8B5CF6' : '#E5E7EB',
+          backgroundColor: brandVoice === v ? '#F5F3FF' : '#FFFFFF',
+          alignItems: 'center'
+        }}
+        onPress={() => setBrandVoice(v)}
+      >
+        <Text style={{
+          fontWeight: '600',
+          color: brandVoice === v ? '#6D28D9' : '#374151'
+        }}>
+          {v}
+        </Text>
+      </TouchableOpacity>
+    ))}
+  </View>
+</View>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+    <Text style={styles.section}>Title</Text>
+    <Text style={{ marginLeft: 6, fontSize: 12, color: '#9CA3AF' }}>
+      (Optional)
+    </Text>
+  </View>
+
+  <TextInput
+    style={styles.input}
+    placeholder="Add your title here"
+    value={title}
+    onChangeText={setTitle}
+  />
             {/* Content */}
             <View style={styles.sectionHeader}>
               <Text style={styles.section}>Content</Text>
@@ -2199,13 +2310,13 @@ const shareViaNative = async () => {
                   style={styles.viewFullButton}
                   onPress={() => setShowFullContent(true)}
                 >
-                  <Text style={styles.viewFullText}>👁 View Full</Text>
+                  <Text style={styles.viewFullText}>Preview Screen</Text>
                 </TouchableOpacity>
               )}
             </View>
             <TextInput
               style={[styles.input, isContentFocused ? styles.textAreaExpanded : styles.textArea, errors.content && styles.inputError]}
-              placeholder="Write your content here…"
+              placeholder="What do you want to share in this post?"
               value={content}
               onChangeText={(text) => {
                 setContent(text);
@@ -2218,32 +2329,24 @@ const shareViaNative = async () => {
             />
             {errors.content && <Text style={styles.errorText}>⚠️ Content is required</Text>}
 
-            {/* Images */}
-            <Text style={styles.section}>Images</Text>
-            <TouchableOpacity style={styles.uploadButton} onPress={pickImage}>
-              <Text style={styles.uploadText}>📷 Select Image</Text>
-            </TouchableOpacity>
-            {images.length > 0 && (
-              <View style={styles.imageContainer}>
-                {images.map((uri, index) => (
-                  <View key={index} style={styles.imageWrapper}>
-                    <TouchableOpacity
-                      style={styles.imageTouchable}
-                      onPress={() => openImageViewer(index)}
-                    >
-                      <Text style={styles.imageUri}>{uri.split('/').pop()}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.removeButton}
-                      onPress={() => removeImage(index)}
-                    >
-                      <Text style={styles.removeText}>✕</Text>
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            )}
-
+            {/* Media Browser Button */}
+<TouchableOpacity
+  style={{
+    marginTop: 10,
+    backgroundColor: '#111827',
+    paddingVertical: 12,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  }}
+  onPress={() => setShowMediaBrowser(true)}
+>
+  <Ionicons name="images-outline" size={18} color="#fff" style={{ marginRight: 8 }} />
+  <Text style={{ color: '#fff', fontWeight: '700' }}>
+    Open Media Browser
+  </Text>
+</TouchableOpacity>
             {/* Online Images */}
             <Text style={styles.section}>Online Images</Text>
             <View style={styles.onlineSearchRow}>
@@ -3762,6 +3865,142 @@ const shareViaNative = async () => {
         </Modal>
       )}
     </View>
+    {/* Media Browser Modal */}
+<Modal visible={showMediaBrowser} animationType="slide">
+  <View style={{ flex: 1, backgroundColor: '#F9FAFB' }}>
+
+    {/* Header */}
+    <View style={{
+      paddingTop: 60,
+      paddingBottom: 20,
+      paddingHorizontal: 20,
+      backgroundColor: '#111827',
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center'
+    }}>
+      <Text style={{ color: '#fff', fontSize: 20, fontWeight: '800' }}>
+        Media Browser
+      </Text>
+      <TouchableOpacity onPress={() => setShowMediaBrowser(false)}>
+        <Ionicons name="close" size={28} color="#fff" />
+      </TouchableOpacity>
+    </View>
+
+    <ScrollView contentContainerStyle={{ padding: 20 }}>
+
+      {/* Unsplash Search */}
+      <Text style={{ fontSize: 16, fontWeight: '700', marginBottom: 10 }}>
+        Unsplash Recommendations
+      </Text>
+
+      <View style={{ flexDirection: 'row', marginBottom: 15 }}>
+        <TextInput
+          style={{
+            flex: 1,
+            backgroundColor: '#fff',
+            borderRadius: 10,
+            paddingHorizontal: 12,
+            borderWidth: 1,
+            borderColor: '#E5E7EB'
+          }}
+          placeholder="Search Unsplash..."
+          value={imageSearchQuery}
+          onChangeText={setImageSearchQuery}
+        />
+        <TouchableOpacity
+          style={{
+            marginLeft: 8,
+            backgroundColor: '#10B981',
+            paddingHorizontal: 16,
+            justifyContent: 'center',
+            borderRadius: 10
+          }}
+          onPress={searchOnlineImages}
+        >
+          <Ionicons name="search" size={18} color="#fff" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Unsplash Results */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+        {imageSearchResults.map(item => (
+          <TouchableOpacity
+            key={item.id}
+            style={{
+              width: '48%',
+              aspectRatio: 1,
+              borderRadius: 12,
+              overflow: 'hidden'
+            }}
+            onPress={() => {
+              addOnlineImage(item.fullUrl);
+              setShowMediaBrowser(false);
+            }}
+          >
+            <Image
+              source={{ uri: item.previewUrl }}
+              style={{ width: '100%', height: '100%' }}
+            />
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Device Photos */}
+<Text style={{ fontSize: 16, fontWeight: '700', marginBottom: 10, marginTop: 15 }}>
+  📱 Device Photos
+</Text>
+
+<TouchableOpacity
+  style={{
+    backgroundColor: '#6366F1',
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 20
+  }}
+  onPress={pickImage}
+>
+  <Text style={{ color: '#fff', fontWeight: '700' }}>
+    Select from Device
+  </Text>
+</TouchableOpacity>
+
+{/* Built-in Stock Photos */}
+<Text style={{ fontSize: 16, fontWeight: '700', marginBottom: 10 }}>
+  🖼 Stock Photos
+</Text>
+
+<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 }}>
+  {STOCK_PHOTOS.map(item => (
+    <TouchableOpacity
+      key={item.id}
+      style={{
+        width: '48%',
+        aspectRatio: 1,
+        borderRadius: 12,
+        overflow: 'hidden'
+      }}
+      onPress={() => {
+        // Convert local asset to URI for your images array
+        const uri = Image.resolveAssetSource(item.source).uri;
+        if (!images.includes(uri)) {
+          setImages([...images, uri]);
+        }
+        setShowMediaBrowser(false);
+      }}
+    >
+      <Image
+        source={item.source}
+        style={{ width: '100%', height: '100%' }}
+        resizeMode="cover"
+      />
+    </TouchableOpacity>
+  ))}
+</View>
+    </ScrollView>
+  </View>
+</Modal>
     </Modal>
     </>
   );
