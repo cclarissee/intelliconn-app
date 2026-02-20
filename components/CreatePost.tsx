@@ -783,30 +783,38 @@ Return ONLY the hashtags separated by spaces, each starting with #. No other tex
    * Allows image editing and sets quality to 0.8
    * Adds selected image to the images array
    */
-  const pickImage = async () => {
-    // Request permissions
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
+const pickImage = async () => {
+  try {
+    const permissionResult =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permissionResult.granted) {
       showWarning({
-        title: '⚠️ Permission Required',
-        message: 'Camera roll permissions are needed to select images.',
-        duration: 4000,
+        title: 'Permission Required',
+        message: 'Allow gallery access to select images.',
+        duration: 3000,
       });
       return;
     }
 
-    // Launch image picker
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
+      allowsEditing: false,
       quality: 0.8,
     });
 
-    if (!result.canceled) {
-      setImages([...images, result.assets[0].uri]);
+    if (!result.canceled && result.assets?.length > 0) {
+      const selectedUri = result.assets[0].uri;
+
+      console.log("Selected Image URI:", selectedUri); // DEBUG
+
+      setImages(prev => [...prev, selectedUri]);
+      setShowMediaBrowser(false);
     }
-  };
+  } catch (error) {
+    console.log("Image picker error:", error);
+  }
+};
 
   const saveImageSearchQuery = async (query: string) => {
     const user = getAuth().currentUser;
@@ -2289,11 +2297,43 @@ const shareViaNative = async () => {
   </View>
 </View>
 
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+<View style={{
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  marginBottom: 6
+}}>
+  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
     <Text style={styles.section}>Title</Text>
     <Text style={{ marginLeft: 6, fontSize: 12, color: '#9CA3AF' }}>
       (Optional)
     </Text>
+  </View>
+
+  {/* Small Preview Button */}
+  {platforms.length > 0 && (
+    <TouchableOpacity
+      onPress={() => setShowPreview(true)}
+      style={{
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        backgroundColor: '#EEF2FF',
+        borderRadius: 8,
+        flexDirection: 'row',
+        alignItems: 'center'
+      }}
+    >
+      <Ionicons name="eye-outline" size={14} color="#6366F1" />
+      <Text style={{
+        marginLeft: 4,
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#4338CA'
+      }}>
+        Preview
+      </Text>
+    </TouchableOpacity>
+  )}
   </View>
 
   <TextInput
@@ -2347,6 +2387,48 @@ const shareViaNative = async () => {
     Open Media Browser
   </Text>
 </TouchableOpacity>
+{images.length > 0 && (
+  <View style={{ marginTop: 12 }}>
+    <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 8 }}>
+      Selected Images
+    </Text>
+
+    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+      {images.map((uri, index) => (
+        <View key={index} style={{ marginRight: 10 }}>
+          <Image
+            source={{ uri }}
+            style={{
+              width: 100,
+              height: 100,
+              borderRadius: 12,
+              backgroundColor: '#E5E7EB'
+            }}
+            resizeMode="cover"
+          />
+
+          {/* Remove Button */}
+          <TouchableOpacity
+            onPress={() => removeImage(index)}
+            style={{
+              position: 'absolute',
+              top: -6,
+              right: -6,
+              backgroundColor: '#EF4444',
+              borderRadius: 12,
+              width: 24,
+              height: 24,
+              justifyContent: 'center',
+              alignItems: 'center'
+            }}
+          >
+            <Ionicons name="close" size={14} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      ))}
+    </ScrollView>
+  </View>
+)}
             {/* Online Images */}
             <Text style={styles.section}>Online Images</Text>
             <View style={styles.onlineSearchRow}>
@@ -2628,18 +2710,6 @@ const shareViaNative = async () => {
     </View>
   )}
 </View>
-
-            {/* Preview Button */}
-            {platforms.length > 0 && (
-              <TouchableOpacity
-                style={{ backgroundColor: '#8B5CF6', paddingVertical: 12, paddingHorizontal: 20, borderRadius: 14, marginBottom: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}
-                onPress={() => setShowPreview(true)}
-              >
-                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>👁 Preview Post</Text>
-              </TouchableOpacity>
-            )}
-
-            
             {/* Quick Schedule Section - Enhanced Design */}
             <View style={{ 
               backgroundColor: '#F9FAFB', 
@@ -3935,7 +4005,6 @@ const shareViaNative = async () => {
             }}
             onPress={() => {
               addOnlineImage(item.fullUrl);
-              setShowMediaBrowser(false);
             }}
           >
             <Image
