@@ -128,6 +128,12 @@ export default function CreatePost({ visible, onClose, post, onNotify }: { visib
   const notify = onNotify ?? showSuccess;
   const shouldRenderNotification = true; // Always render to show warnings and success
   const [showMediaBrowser, setShowMediaBrowser] = useState(false);
+  const [engagementScore, setEngagementScore] = useState<number | null>(null);
+const [hookStrength, setHookStrength] = useState<string>('');
+const [sentiment, setSentiment] = useState<string>('');
+const [platformSuggestions, setPlatformSuggestions] = useState<string[]>([]);
+const [isAnalyzingPost, setIsAnalyzingPost] = useState(false);
+
   const STOCK_PHOTOS = [
   {
     id: 'tech1',
@@ -210,7 +216,9 @@ export default function CreatePost({ visible, onClose, post, onNotify }: { visib
   const contentSpinAnim = useRef(new Animated.Value(0)).current;
   const hashtagSpinAnim = useRef(new Animated.Value(0)).current;
   const [errors, setErrors] = useState<{ title?: boolean; content?: boolean; platforms?: boolean }>({});
-  
+  const [aiInsights, setAiInsights] = useState<string[]>([]);
+  const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
+
   // Custom schedule options
   const [customSchedules, setCustomSchedules] = useState<Array<{id?: string; label: string; minutes?: number; hours?: number; days?: number}>>([]);
   const [quickSchedules, setQuickSchedules] = useState<Array<{id: string; label: string; minutes?: number; hours?: number; days?: number; icon?: string; color?: string}>>([]);
@@ -644,6 +652,62 @@ Post content:`;
     }
   };
 
+  const generateInsights = async () => {
+  if (!content.trim()) {
+    showWarning({
+      title: '⚠️ No Content',
+      message: 'Write content first to analyze.',
+      duration: 3000,
+    });
+    return;
+  }
+
+  try {
+    setIsGeneratingInsights(true);
+
+    const geminiApiKey = await fetchGeminiApiKey();
+    if (!geminiApiKey) return;
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: `
+You are a social media growth strategist.
+
+Analyze this post and give 5 short actionable improvements.
+Keep each suggestion under 15 words.
+No long explanations.
+
+Post:
+${content}
+              `
+            }]
+          }]
+        })
+      }
+    );
+
+    const data = await response.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+    const suggestions = text
+      .split('\n')
+      .map((line: string) => line.replace(/^\d+[\).\s-]*/, '').trim())
+      .filter((line: string) => line.length > 0);
+
+    setAiInsights(suggestions);
+  } catch (error) {
+    console.log(error);
+  } finally {
+    setIsGeneratingInsights(false);
+  }
+};
+
   /**
    * Placeholder function for AI image generation
    * Currently shows a coming soon message
@@ -776,6 +840,84 @@ Return ONLY the hashtags separated by spaces, each starting with #. No other tex
       });
     }
   };
+
+  const analyzePost = async () => {
+  if (!content.trim()) {
+    showWarning({
+      title: '⚠️ No Content',
+      message: 'Write content first to analyze.',
+      duration: 3000,
+    });
+    return;
+  }
+
+  try {
+    setIsAnalyzingPost(true);
+
+    const geminiApiKey = await fetchGeminiApiKey();
+    if (!geminiApiKey) return;
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: `
+You are a senior social media growth strategist.
+
+Analyze this post and respond STRICTLY in this format:
+
+Engagement Score: <number 0-100>
+Hook Strength: <Weak | Moderate | Strong>
+Sentiment: <Positive | Neutral | Negative>
+
+Platform Suggestions:
+Instagram: <short suggestion>
+Facebook: <short suggestion>
+Twitter: <short suggestion>
+
+Post:
+${content}
+              `
+            }]
+          }]
+        })
+      }
+    );
+
+    const data = await response.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+    // Parse AI Response
+    const scoreMatch = text.match(/Engagement Score:\s*(\d+)/);
+    const hookMatch = text.match(/Hook Strength:\s*(.*)/);
+    const sentimentMatch = text.match(/Sentiment:\s*(.*)/);
+
+    const igMatch = text.match(/Instagram:\s*(.*)/);
+    const fbMatch = text.match(/Facebook:\s*(.*)/);
+    const twMatch = text.match(/Twitter:\s*(.*)/);
+
+    setEngagementScore(scoreMatch ? Number(scoreMatch[1]) : null);
+    setHookStrength(hookMatch ? hookMatch[1].trim() : '');
+    setSentiment(sentimentMatch ? sentimentMatch[1].trim() : '');
+
+    const suggestions = [
+      igMatch ? `Instagram: ${igMatch[1]}` : '',
+      fbMatch ? `Facebook: ${fbMatch[1]}` : '',
+      twMatch ? `Twitter: ${twMatch[1]}` : '',
+    ].filter(Boolean);
+
+    setPlatformSuggestions(suggestions);
+
+  } catch (error) {
+    console.log(error);
+  } finally {
+    setIsAnalyzingPost(false);
+  }
+};
 
   /**
    * Opens the device's image picker to select an image
@@ -2347,11 +2489,7 @@ const shareViaNative = async () => {
               <Text style={styles.section}>Content</Text>
               {content.length > 100 && (
                 <TouchableOpacity 
-                  style={styles.viewFullButton}
-                  onPress={() => setShowFullContent(true)}
-                >
-                  <Text style={styles.viewFullText}>Preview Screen</Text>
-                </TouchableOpacity>
+                ></TouchableOpacity>
               )}
             </View>
             <TextInput
@@ -2369,6 +2507,75 @@ const shareViaNative = async () => {
             />
             {errors.content && <Text style={styles.errorText}>⚠️ Content is required</Text>}
 
+            <View style={{
+  marginTop: 16,
+  backgroundColor: '#F8FAFC',
+  borderRadius: 16,
+  padding: 16,
+  borderWidth: 1,
+  borderColor: '#E2E8F0'
+}}>
+  <View style={{
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12
+  }}>
+    <Text style={{
+      fontSize: 15,
+      fontWeight: '800',
+      color: '#111827'
+    }}>
+      ✨ AI Post Analyzer
+    </Text>
+
+    <TouchableOpacity
+      onPress={analyzePost}
+      disabled={isAnalyzingPost}
+    >
+      <Text style={{
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#6366F1'
+      }}>
+        {isAnalyzingPost ? 'Analyzing...' : 'Analyze'}
+      </Text>
+    </TouchableOpacity>
+  </View>
+
+  {engagementScore !== null && (
+    <View style={{ marginBottom: 10 }}>
+      <Text style={{ fontSize: 14, fontWeight: '700', color: '#10B981' }}>
+        📊 Engagement Score: {engagementScore}/100
+      </Text>
+    </View>
+  )}
+
+  {hookStrength && (
+    <Text style={{ fontSize: 13, marginBottom: 6 }}>
+      🔥 Hook Strength: {hookStrength}
+    </Text>
+  )}
+
+  {sentiment && (
+    <Text style={{ fontSize: 13, marginBottom: 6 }}>
+      🧠 Sentiment: {sentiment}
+    </Text>
+  )}
+
+  {platformSuggestions.length > 0 && (
+    <View style={{ marginTop: 8 }}>
+      <Text style={{ fontSize: 13, fontWeight: '700', marginBottom: 6 }}>
+        🎯 Platform Suggestions
+      </Text>
+      {platformSuggestions.map((item, index) => (
+        <Text key={index} style={{ fontSize: 13, color: '#374151', marginBottom: 4 }}>
+          • {item}
+        </Text>
+      ))}
+    </View>
+  )}
+</View>
             {/* Media Browser Button */}
 <TouchableOpacity
   style={{
@@ -3635,7 +3842,7 @@ const shareViaNative = async () => {
               }}>
                 <Ionicons name="information-circle" size={20} color="#3B82F6" style={{ marginRight: 10, marginTop: 1 }} />
                 <Text style={{ fontSize: 12, color: '#1E40AF', flex: 1, lineHeight: 18 }}>
-                  Your custom schedule will be saved to your account and available across all your devices.
+                  Your custom schedule will be saved and available in all devices.
                 </Text>
               </View>
             </ScrollView>
